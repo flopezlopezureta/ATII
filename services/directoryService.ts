@@ -1,9 +1,4 @@
-
-
-import { DirectoryUser, DirectoryVehicle, TenantDetails, OccupantDetails, UserPermissions } from '../types.ts';
-import { getPermissionsForRole } from './roleService.ts';
-
-const DIRECTORY_USERS_STORAGE_KEY = 'condominiumDirectoryUsers';
+import { DirectoryUser, UserPermissions } from '../types.ts';
 
 export const defaultPermissions: UserPermissions = {
   authorizePeople: false,
@@ -13,111 +8,90 @@ export const defaultPermissions: UserPermissions = {
   authorizeInvitations: false,
 };
 
-export const getDirectoryUsers = (): DirectoryUser[] => {
-  const usersJson = localStorage.getItem(DIRECTORY_USERS_STORAGE_KEY);
-  if (usersJson) {
-    try {
-      const users = JSON.parse(usersJson) as DirectoryUser[];
-      // Ensure backward compatibility for users stored before new fields were added
-      const usersWithAllFields = users.map(user => ({
-        ...user,
-        authUserId: user.authUserId || undefined,
-        roleNotes: user.roleNotes || undefined,
-        vehicles: user.vehicles || [],
-        tenant: user.tenant === undefined ? null : user.tenant, 
-        occupants: user.occupants || [], 
-        petsInfo: user.petsInfo || '', 
-        unitParkingSpots: user.unitParkingSpots || [],
-        permissions: user.permissions || getPermissionsForRole(user.role), // Fallback for older users
-        workShift: user.workShift || undefined,
-      }));
-      return usersWithAllFields.sort((a, b) => a.name.localeCompare(b.name));
-    } catch (error) {
-      console.error("Error parsing directory users from localStorage:", error);
-      return [];
-    }
+let cachedDirectoryUsers: DirectoryUser[] = [];
+
+export const getDirectoryUsers = async (): Promise<DirectoryUser[]> => {
+  try {
+    const res = await fetch('/api/directory');
+    if (!res.ok) throw new Error('Error status: ' + res.status);
+    const data = await res.json();
+    cachedDirectoryUsers = data;
+    return data;
+  } catch (error) {
+    console.error("Error fetching directory users:", error);
+    return [];
   }
-  return [];
 };
 
-export const addDirectoryUser = (user: Omit<DirectoryUser, 'id' | 'createdAt' | 'updatedAt'>): DirectoryUser[] => {
-  const users = getDirectoryUsers();
-  const now = new Date().toISOString();
-  
-  // Get permissions based on the role, unless specific permissions are already provided (e.g. for staff).
-  const permissionsForRole = getPermissionsForRole(user.role);
-
-  const newUser: DirectoryUser = {
-    ...user,
-    id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-    authUserId: user.authUserId || undefined,
-    roleNotes: user.roleNotes || undefined,
-    vehicles: user.vehicles || [],
-    tenant: user.tenant || null,
-    occupants: user.occupants || [],
-    petsInfo: user.petsInfo || '',
-    unitParkingSpots: user.unitParkingSpots || [],
-    permissions: user.permissions || permissionsForRole,
-    workShift: user.workShift || undefined,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const updatedUsers = [...users, newUser];
-  localStorage.setItem(DIRECTORY_USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
-  return updatedUsers.sort((a, b) => a.name.localeCompare(b.name));
-};
-
-export const updateDirectoryUser = (userId: string, updates: Partial<Omit<DirectoryUser, 'id' | 'createdAt'>>): DirectoryUser[] => {
-  let users = getDirectoryUsers();
-  const userIndex = users.findIndex(u => u.id === userId);
-  if (userIndex > -1) {
-    const originalUser = users[userIndex];
-
-    // Create the updated user object by merging
-    const updatedUser: DirectoryUser = {
-      ...originalUser,
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Special handling: if role is changed, and permissions are not part of the update payload,
-    // then update permissions to match the new role.
-    if (updates.role && updates.role !== originalUser.role && updates.permissions === undefined) {
-      updatedUser.permissions = getPermissionsForRole(updates.role);
-    }
-    
-    users[userIndex] = updatedUser;
-    localStorage.setItem(DIRECTORY_USERS_STORAGE_KEY, JSON.stringify(users));
-    return users.sort((a, b) => a.name.localeCompare(b.name));
+export const addDirectoryUser = async (user: Omit<DirectoryUser, 'id' | 'createdAt' | 'updatedAt'>): Promise<DirectoryUser[]> => {
+  try {
+    const res = await fetch('/api/directory', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(user),
+    });
+    if (!res.ok) throw new Error('Error status: ' + res.status);
+    const data = await res.json();
+    cachedDirectoryUsers = data;
+    return data;
+  } catch (error) {
+    console.error("Error adding directory user:", error);
+    throw error;
   }
-  return users; 
 };
 
-export const deleteDirectoryUser = (userId: string): DirectoryUser[] => {
-  let users = getDirectoryUsers();
-  users = users.filter(u => u.id !== userId);
-  localStorage.setItem(DIRECTORY_USERS_STORAGE_KEY, JSON.stringify(users));
-  return users.sort((a, b) => a.name.localeCompare(b.name));
+export const updateDirectoryUser = async (userId: string, updates: Partial<Omit<DirectoryUser, 'id' | 'createdAt'>>): Promise<DirectoryUser[]> => {
+  try {
+    const res = await fetch(`/api/directory/${userId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Error status: ' + res.status);
+    const data = await res.json();
+    cachedDirectoryUsers = data;
+    return data;
+  } catch (error) {
+    console.error("Error updating directory user:", error);
+    throw error;
+  }
 };
 
+export const deleteDirectoryUser = async (userId: string): Promise<DirectoryUser[]> => {
+  try {
+    const res = await fetch(`/api/directory/${userId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Error status: ' + res.status);
+    const data = await res.json();
+    cachedDirectoryUsers = data;
+    return data;
+  } catch (error) {
+    console.error("Error deleting directory user:", error);
+    throw error;
+  }
+};
+
+// Synchronous lookups over the in-memory cache to prevent refactoring forms
 export const findDirectoryUserByRUT = (rut: string): DirectoryUser | undefined => {
   if (!rut.trim()) return undefined;
-  const users = getDirectoryUsers();
   const cleanedSearchRUT = rut.trim().replace(/[^0-9kK]+/g, '').toUpperCase();
-  return users.find(u => u.idDocument && u.idDocument.replace(/[^0-9kK]+/g, '').toUpperCase() === cleanedSearchRUT);
+  return cachedDirectoryUsers.find(u => u.idDocument && u.idDocument.replace(/[^0-9kK]+/g, '').toUpperCase() === cleanedSearchRUT);
 };
 
 export const findDirectoryUserByAuthId = (authUserId: string): DirectoryUser | undefined => {
   if (!authUserId.trim()) return undefined;
-  const users = getDirectoryUsers();
-  return users.find(u => u.authUserId === authUserId);
+  return cachedDirectoryUsers.find(u => u.authUserId === authUserId);
 };
 
-export const findDirectoryUserByVehicleLicensePlate = (licensePlate: string): { user: DirectoryUser, vehicle: DirectoryVehicle } | undefined => {
+export const findDirectoryUserByVehicleLicensePlate = (licensePlate: string): { user: DirectoryUser, vehicle: any } | undefined => {
   if (!licensePlate.trim()) return undefined;
-  const users = getDirectoryUsers();
   const cleanedPlate = licensePlate.trim().toUpperCase();
-  for (const user of users) {
+  for (const user of cachedDirectoryUsers) {
     if (user.vehicles && user.vehicles.length > 0) {
       const foundVehicle = user.vehicles.find(v => v.licensePlate.toUpperCase() === cleanedPlate);
       if (foundVehicle) {
@@ -128,11 +102,10 @@ export const findDirectoryUserByVehicleLicensePlate = (licensePlate: string): { 
   return undefined;
 };
 
-export const findDirectoryUserByParkingSpot = (parkingSpot: string): { user: DirectoryUser, vehicle: DirectoryVehicle } | undefined => {
+export const findDirectoryUserByParkingSpot = (parkingSpot: string): { user: DirectoryUser, vehicle: any } | undefined => {
   if (!parkingSpot.trim()) return undefined;
-  const users = getDirectoryUsers();
   const cleanedSpot = parkingSpot.trim().toUpperCase();
-  for (const user of users) {
+  for (const user of cachedDirectoryUsers) {
     if (user.vehicles && user.vehicles.length > 0) {
       const foundVehicle = user.vehicles.find(v => v.parkingSpot?.trim().toUpperCase() === cleanedSpot);
       if (foundVehicle) {

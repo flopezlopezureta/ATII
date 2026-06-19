@@ -119,8 +119,8 @@ const PersonForm: React.FC<PersonFormProps> = ({ onEntryAdded, currentUser, appS
   }, [userProfile, isPrivilegedUser]);
 
 
-  const handleInvitationScan = (invitationId: string) => {
-    const invitation = getInvitationById(invitationId);
+  const handleInvitationScan = async (invitationId: string) => {
+    const invitation = await getInvitationById(invitationId);
     
     if (!invitation) {
         setScanInputFeedback(`Error: Invitación con ID ${invitationId} no encontrada.`);
@@ -153,8 +153,11 @@ const PersonForm: React.FC<PersonFormProps> = ({ onEntryAdded, currentUser, appS
   
   useEffect(() => {
     if (invitationIdToProcess && onInvitationProcessed) {
-      handleInvitationScan(invitationIdToProcess);
-      onInvitationProcessed();
+      const processInvitation = async () => {
+        await handleInvitationScan(invitationIdToProcess);
+        onInvitationProcessed();
+      };
+      processInvitation();
     }
   }, [invitationIdToProcess, onInvitationProcessed]);
 
@@ -281,7 +284,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ onEntryAdded, currentUser, appS
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
@@ -336,12 +339,12 @@ const PersonForm: React.FC<PersonFormProps> = ({ onEntryAdded, currentUser, appS
       status: initialStatus,
     };
     
-    const updatedEntries = addEntry(newPersonEntry as PersonEntry);
+    const updatedEntries = await addEntry(newPersonEntry as PersonEntry);
     
     if (linkedInvitation) {
         const newEntryRecord = updatedEntries.find(entry => entry.id === entry.id && (entry as PersonEntry).invitationId === linkedInvitation.id);
         if (newEntryRecord) {
-            markInvitationAsUsed(linkedInvitation.id, newEntryRecord.id);
+            await markInvitationAsUsed(linkedInvitation.id, newEntryRecord.id);
         }
     }
 

@@ -14,8 +14,12 @@ interface VisitorAuthorizationScreenProps {
 }
 
 const VisitorAuthorizationScreen: React.FC<VisitorAuthorizationScreenProps> = ({ onProcessInvitation }) => {
-  const [allInvitations] = useState<Invitation[]>(getInvitations());
+  const [allInvitations, setAllInvitations] = useState<Invitation[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    getInvitations().then(setAllInvitations);
+  }, []);
 
   const activeInvitations = useMemo(() => {
     return allInvitations.filter(inv => {

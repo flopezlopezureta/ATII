@@ -36,11 +36,11 @@ const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ switchToLogin
       return;
     }
     
-    setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const result = resetPassword(token, newPassword);
-    setLoading(false);
+
     
+    setLoading(true);
+    const result = await resetPassword(token, newPassword);
+    setLoading(false);
     if (result.success) {
       alert(result.message); // Show success message
       switchToLogin(); // Redirect to login

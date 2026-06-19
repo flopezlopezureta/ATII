@@ -13,8 +13,13 @@ interface NotificationsScreenProps {
 }
 
 const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ currentUser, onNotificationsUpdated }) => {
-  const [allDirectoryUsers] = useState<DirectoryUser[]>(getDirectoryUsers());
-  const [allNotifications, setAllNotifications] = useState<Notification[]>(getNotifications());
+  const [allDirectoryUsers, setAllDirectoryUsers] = useState<DirectoryUser[]>([]);
+  const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
+  
+  React.useEffect(() => {
+    getDirectoryUsers().then(setAllDirectoryUsers);
+    getNotifications().then(setAllNotifications);
+  }, []);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<DirectoryUser | null>(null);
@@ -48,14 +53,14 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ currentUser, 
     setSearchTerm('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) {
       showFeedback('error', 'Por favor, seleccione un residente destinatario.');
       return;
     }
 
-    addNotification({
+    await addNotification({
       recipientDirUserId: selectedUser.id,
       recipientName: selectedUser.name,
       recipientApt: selectedUser.apartment || 'N/A',
@@ -65,7 +70,8 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ currentUser, 
     });
 
     showFeedback('success', `Notificación enviada a ${selectedUser.name}.`);
-    setAllNotifications(getNotifications());
+    const notifs = await getNotifications();
+    setAllNotifications(notifs);
     onNotificationsUpdated();
     
     // Reset form
@@ -74,12 +80,12 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ currentUser, 
     setDeliveryType(NotificationType.PACKAGE);
   };
 
-  const handleMarkAsDelivered = (notificationId: string) => {
-    updateNotification(notificationId, { 
+  const handleMarkAsDelivered = async (notificationId: string) => {
+    const updated = await updateNotification(notificationId, { 
         status: NotificationStatus.DELIVERED,
         deliveredAt: new Date().toISOString()
     });
-    setAllNotifications(getNotifications());
+    setAllNotifications(updated);
     onNotificationsUpdated();
     showFeedback('success', 'Notificación marcada como entregada.');
   };

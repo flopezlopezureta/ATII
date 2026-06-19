@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DirectoryUser, ParkingLoanRequest, ParkingLoanStatus, SessionUser, Invitation } from '../../types.ts';
 import { getDirectoryUsers } from '../../services/directoryService.ts';
+import { getInvitationById } from '../../services/invitationService.ts';
 import { 
     getParkingLoans, 
     createParkingLoanRequest, 
@@ -55,14 +56,23 @@ const ParkingLoanManager: React.FC<ParkingLoanManagerProps> = ({ currentUser, us
   // Invitación generada para mostrar modal de compartir
   const [generatedInvitation, setGeneratedInvitation] = useState<Invitation | null>(null);
 
-  const allDirectoryUsers = useMemo(() => getDirectoryUsers().filter(u => u.id !== userProfile.id), [userProfile.id]);
+  const [allDirectoryUsers, setAllDirectoryUsers] = useState<DirectoryUser[]>([]);
+  
+  useEffect(() => {
+    getDirectoryUsers().then(users => {
+      setAllDirectoryUsers(users.filter(u => u.id !== userProfile.id));
+    });
+  }, [userProfile.id]);
   
   const mySpots = useMemo(() => [
     ...(userProfile.unitParkingSpots || []),
     ...(userProfile.vehicles || []).map(v => v.parkingSpot).filter((s): s is string => !!s)
   ], [userProfile]);
 
-  const loadAllLoans = () => setLoans(getParkingLoans());
+  const loadAllLoans = async () => {
+    const data = await getParkingLoans();
+    setLoans(data);
+  };
 
   useEffect(() => {
     loadAllLoans();
@@ -76,10 +86,10 @@ const ParkingLoanManager: React.FC<ParkingLoanManagerProps> = ({ currentUser, us
     ).slice(0, 5);
   }, [neighborSearch, allDirectoryUsers]);
 
-  const handleSendLoan = () => {
+  const handleSendLoan = async () => {
     if (!selectedNeighbor || !selectedSpot) return;
     
-    const result = createParkingLoanRequest({
+    const result = await createParkingLoanRequest({
         lenderId: currentUser.id,
         lenderName: userProfile.name,
         lenderApt: userProfile.apartment || 'N/A',
@@ -94,29 +104,29 @@ const ParkingLoanManager: React.FC<ParkingLoanManagerProps> = ({ currentUser, us
         return;
     }
     
-    loadAllLoans();
+    await loadAllLoans();
     setSelectedNeighbor(null);
     setNeighborSearch('');
     setSelectedSpot('');
     alert(`Solicitud enviada a ${selectedNeighbor.name}`);
   };
 
-  const handleRequestParking = () => {
-    createPublicBorrowRequest({
+  const handleRequestParking = async () => {
+    await createPublicBorrowRequest({
         id: currentUser.id,
         name: userProfile.name,
         apt: userProfile.apartment || 'N/A'
     });
-    loadAllLoans();
+    await loadAllLoans();
     alert("Tu solicitud ha sido publicada en el buzón comunitario.");
   };
 
-  const handleFulfillRequest = (requestId: string) => {
+  const handleFulfillRequest = async (requestId: string) => {
     if (!selectedSpot) {
         alert("Por favor selecciona cuál de tus estacionamientos deseas prestar.");
         return;
     }
-    const result = fulfillPublicRequest(requestId, {
+    const result = await fulfillPublicRequest(requestId, {
         id: currentUser.id,
         name: userProfile.name,
         apt: userProfile.apartment || 'N/A',
@@ -127,17 +137,17 @@ const ParkingLoanManager: React.FC<ParkingLoanManagerProps> = ({ currentUser, us
         alert(result.message);
         setFulfillingRequestId(null);
         setSelectedSpot('');
-        loadAllLoans();
+        await loadAllLoans();
     } else {
         alert(result.message);
     }
   };
 
-  const handleCompleteReceived = (e: React.FormEvent) => {
+  const handleCompleteReceived = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!completingLoan) return;
 
-    const invitation = completeParkingLoan(completingLoan.id, {
+    const invitation = await completeParkingLoan(completingLoan.id, {
         name: visitorName,
         plate: visitorPlate,
         rut: visitorRut,
@@ -147,7 +157,7 @@ const ParkingLoanManager: React.FC<ParkingLoanManagerProps> = ({ currentUser, us
     if (invitation) {
         setGeneratedInvitation(invitation);
         setCompletingLoan(null);
-        loadAllLoans();
+        await loadAllLoans();
         // Limpiar campos
         setVisitorName('');
         setVisitorPlate('');
@@ -250,7 +260,7 @@ const ParkingLoanManager: React.FC<ParkingLoanManagerProps> = ({ currentUser, us
                             <p className="font-medium text-slate-700">Para: {l.borrowerName} ({l.borrowerApt})</p>
                             <p className="text-slate-500 font-mono">Estac: {l.spot} | {l.status === 'pending' ? '⏳ Esperando visita' : `✅ Placa: ${l.visitorPlate}`}</p>
                         </div>
-                        {l.status === 'pending' && <button onClick={() => {cancelParkingLoan(l.id); loadAllLoans();}} className="text-red-500 font-bold px-2 py-1">X</button>}
+                        {l.status === 'pending' && <button onClick={async () => {await cancelParkingLoan(l.id); await loadAllLoans();}} className="text-red-500 font-bold px-2 py-1">X</button>}
                     </div>
                 ))}
                 {mySentLoans.length === 0 && <p className="text-center text-slate-400 py-4 text-xs italic">No has realizado préstamos directos.</p>}
@@ -324,11 +334,12 @@ const ParkingLoanManager: React.FC<ParkingLoanManagerProps> = ({ currentUser, us
                                     <div className="mt-2 flex gap-2">
                                         <p className="text-[10px] text-green-600 font-bold uppercase">✓ Invitación Generada</p>
                                         <button 
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 const invId = l.invitationId;
-                                                const invitations = JSON.parse(localStorage.getItem('condominiumInvitations') || '[]');
-                                                const inv = invitations.find((i: any) => i.id === invId);
-                                                if (inv) setGeneratedInvitation(inv);
+                                                if (invId) {
+                                                    const inv = await getInvitationById(invId);
+                                                    if (inv) setGeneratedInvitation(inv);
+                                                }
                                             }}
                                             className="text-[10px] text-sky-600 font-bold underline uppercase"
                                         >
@@ -343,7 +354,7 @@ const ParkingLoanManager: React.FC<ParkingLoanManagerProps> = ({ currentUser, us
                                         Cargar Visita
                                     </button>
                                 )}
-                                <button onClick={() => {cancelParkingLoan(l.id); loadAllLoans();}} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
+                                <button onClick={async () => {await cancelParkingLoan(l.id); await loadAllLoans();}} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
                                     <TrashIcon className="w-4 h-4"/>
                                 </button>
                             </div>

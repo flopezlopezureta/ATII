@@ -29,68 +29,74 @@ const QuickAccessForm: React.FC<QuickAccessFormProps> = ({ onEntryAdded }) => {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const performSearch = useCallback((term: string) => {
+  const performSearch = useCallback(async (term: string) => {
     if (term.trim().length < 3) {
       setResults([]);
       return;
     }
 
     setLoading(true);
-    const directoryUsers = getDirectoryUsers();
-    const lowerTerm = term.toLowerCase();
-    const upperTerm = term.toUpperCase();
-    const cleanedRutTerm = cleanRUT(term);
-    const searchResults: SearchResult[] = [];
-    const now = new Date();
+    try {
+      const directoryUsers = await getDirectoryUsers();
+      const lowerTerm = term.toLowerCase();
+      const upperTerm = term.toUpperCase();
+      const cleanedRutTerm = cleanRUT(term);
+      const searchResults: SearchResult[] = [];
+      const now = new Date();
 
-    // Search Invitations first
-    const allInvitations = getInvitations();
-    const matchedInvitation = allInvitations.find(inv => 
-        inv.id.toUpperCase() === upperTerm && 
-        inv.status === 'active' && 
-        now >= new Date(inv.validFrom) && 
-        now <= new Date(inv.validUntil)
-    );
-    if (matchedInvitation) {
-        const creatorUser = directoryUsers.find(u => u.id === matchedInvitation.createdByUserId);
-        if (creatorUser) {
-            searchResults.push({
-                user: creatorUser,
-                matchType: 'Invitación',
-                matchValue: matchedInvitation.id,
-                vehicle: matchedInvitation.type === 'vehicle' ? { id: matchedInvitation.id, licensePlate: matchedInvitation.licensePlate || 'N/A' } : undefined
-            });
+      // Search Invitations first
+      const allInvitations = await getInvitations();
+      const matchedInvitation = allInvitations.find(inv => 
+          inv.id.toUpperCase() === upperTerm && 
+          inv.status === 'active' && 
+          now >= new Date(inv.validFrom) && 
+          now <= new Date(inv.validUntil)
+      );
+      if (matchedInvitation) {
+          const creatorUser = directoryUsers.find(u => u.id === matchedInvitation.createdByUserId);
+          if (creatorUser) {
+              searchResults.push({
+                  user: creatorUser,
+                  matchType: 'Invitación',
+                  matchValue: matchedInvitation.id,
+                  vehicle: matchedInvitation.type === 'vehicle' ? { id: matchedInvitation.id, licensePlate: matchedInvitation.licensePlate || 'N/A' } : undefined
+              });
+          }
+      }
+
+      for (const user of directoryUsers) {
+        // Check user's name
+        if (user.name.toLowerCase().includes(lowerTerm)) {
+          searchResults.push({ user, matchType: 'Nombre', matchValue: user.name });
         }
-    }
-
-
-    for (const user of directoryUsers) {
-      // Check user's name
-      if (user.name.toLowerCase().includes(lowerTerm)) {
-        searchResults.push({ user, matchType: 'Nombre', matchValue: user.name });
-      }
-      // Check user's RUT
-      if (user.idDocument && cleanRUT(user.idDocument).includes(cleanedRutTerm)) {
-        searchResults.push({ user, matchType: 'RUT', matchValue: user.idDocument });
-      }
-      // Check tenant's name
-      if (user.tenant && user.tenant.name.toLowerCase().includes(lowerTerm)) {
-        searchResults.push({ user, matchType: 'Nombre', matchValue: `${user.tenant.name} (Arrendatario)` });
-      }
-      // Check tenant's RUT
-      if (user.tenant?.idDocument && cleanRUT(user.tenant.idDocument).includes(cleanedRutTerm)) {
-        searchResults.push({ user, matchType: 'RUT', matchValue: `${user.tenant.idDocument} (Arrendatario)` });
-      }
-      // Check vehicles
-      user.vehicles.forEach(vehicle => {
-        if (vehicle.licensePlate.toLowerCase().includes(lowerTerm)) {
-          searchResults.push({ user, vehicle, matchType: 'Placa Patente', matchValue: vehicle.licensePlate });
+        // Check user's RUT
+        if (user.idDocument && cleanRUT(user.idDocument).includes(cleanedRutTerm)) {
+          searchResults.push({ user, matchType: 'RUT', matchValue: user.idDocument });
         }
-      });
-    }
+        // Check tenant's name
+        if (user.tenant && user.tenant.name.toLowerCase().includes(lowerTerm)) {
+          searchResults.push({ user, matchType: 'Nombre', matchValue: `${user.tenant.name} (Arrendatario)` });
+        }
+        // Check tenant's RUT
+        if (user.tenant?.idDocument && cleanRUT(user.tenant.idDocument).includes(cleanedRutTerm)) {
+          searchResults.push({ user, matchType: 'RUT', matchValue: `${user.tenant.idDocument} (Arrendatario)` });
+        }
+        // Check vehicles
+        if (user.vehicles) {
+          user.vehicles.forEach(vehicle => {
+            if (vehicle.licensePlate.toLowerCase().includes(lowerTerm)) {
+              searchResults.push({ user, vehicle, matchType: 'Placa Patente', matchValue: vehicle.licensePlate });
+            }
+          });
+        }
+      }
 
-    setResults(searchResults.slice(0, 10)); // Limit results to avoid long lists
-    setLoading(false);
+      setResults(searchResults.slice(0, 10)); // Limit results to avoid long lists
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -108,12 +114,12 @@ const QuickAccessForm: React.FC<QuickAccessFormProps> = ({ onEntryAdded }) => {
     setTimeout(() => setFeedback(null), 3000);
   };
   
-  const handleRegisterEntry = (result: SearchResult) => {
+  const handleRegisterEntry = async (result: SearchResult) => {
     let newEntry: CondominiumEntry;
     const now = new Date();
 
     if (result.matchType === 'Invitación') {
-        const invitation = getInvitationById(result.matchValue);
+        const invitation = await getInvitationById(result.matchValue);
         if (!invitation || invitation.status !== 'active' || now < new Date(invitation.validFrom) || now > new Date(invitation.validUntil)) {
             showFeedback('error', 'La invitación ya no es válida o no fue encontrada.');
             return;
@@ -140,7 +146,7 @@ const QuickAccessForm: React.FC<QuickAccessFormProps> = ({ onEntryAdded }) => {
             newEntry = personEntry as PersonEntry;
         }
 
-        const updatedEntries = addEntry(newEntry);
+        const updatedEntries = await addEntry(newEntry);
         const newEntryRecord = updatedEntries.find(e => {
             if (e.type === EntryType.PERSON) return (e as PersonEntry).invitationId === invitation.id;
             if (e.type === EntryType.VEHICLE) return (e as VehicleEntry).invitationId === invitation.id;
@@ -148,7 +154,7 @@ const QuickAccessForm: React.FC<QuickAccessFormProps> = ({ onEntryAdded }) => {
         });
 
         if (newEntryRecord) {
-            markInvitationAsUsed(invitation.id, newEntryRecord.id);
+            await markInvitationAsUsed(invitation.id, newEntryRecord.id);
         }
         onEntryAdded(updatedEntries);
         showFeedback('success', `Ingreso con invitación ${invitation.id} registrado.`);
@@ -163,7 +169,7 @@ const QuickAccessForm: React.FC<QuickAccessFormProps> = ({ onEntryAdded }) => {
         authorizedBy: `Re-ingreso: ${result.user.role} - ${result.user.name}`
       };
       newEntry = vehicleEntry as VehicleEntry;
-      const updatedEntries = addEntry(newEntry);
+      const updatedEntries = await addEntry(newEntry);
       onEntryAdded(updatedEntries);
       showFeedback('success', `Ingreso de ${result.vehicle.licensePlate} registrado exitosamente.`);
     } else {
@@ -176,7 +182,7 @@ const QuickAccessForm: React.FC<QuickAccessFormProps> = ({ onEntryAdded }) => {
         authorizedBy: `Re-ingreso: ${result.user.role} - ${result.user.name}`
       };
       newEntry = personEntry as PersonEntry;
-      const updatedEntries = addEntry(newEntry);
+      const updatedEntries = await addEntry(newEntry);
       onEntryAdded(updatedEntries);
       showFeedback('success', `Ingreso de ${result.user.name} registrado exitosamente.`);
     }

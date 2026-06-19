@@ -26,10 +26,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, switchToRegis
       setError('Nombre de usuario y contraseña son obligatorios.');
       return;
     }
+
     setLoading(true);
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const result = loginUser(username, password);
+    const result = await loginUser(username, password);
     setLoading(false);
     if (result.success) {
       onLoginSuccess();

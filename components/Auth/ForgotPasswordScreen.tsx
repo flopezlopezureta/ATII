@@ -22,11 +22,11 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ switchToLog
       setError('El correo electrónico es obligatorio.');
       return;
     }
-    setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const result = requestPasswordReset(email);
-    setLoading(false);
 
+
+    setLoading(true);
+    const result = await requestPasswordReset(email);
+    setLoading(false);
     if (result.success) {
       setMessage(result.message);
       setRequestSent(true);

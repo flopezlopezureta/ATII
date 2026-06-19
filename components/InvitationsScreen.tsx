@@ -45,8 +45,9 @@ const InvitationsScreen: React.FC<InvitationsScreenProps> = ({ currentUser }) =>
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [selectedInvitation, setSelectedInvitation] = useState<Invitation | null>(null);
 
-  const loadInvitations = useCallback(() => {
-    setInvitations(getInvitations());
+  const loadInvitations = useCallback(async () => {
+    const invites = await getInvitations();
+    setInvitations(invites);
   }, []);
 
   useEffect(() => {
@@ -92,7 +93,7 @@ const InvitationsScreen: React.FC<InvitationsScreenProps> = ({ currentUser }) =>
     }
   };
 
-  const handleCreateInvitation = (e: React.FormEvent) => {
+  const handleCreateInvitation = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (new Date(validUntil) <= new Date(validFrom)) {
@@ -138,25 +139,30 @@ const InvitationsScreen: React.FC<InvitationsScreenProps> = ({ currentUser }) =>
       licensePlate: type === 'vehicle' ? licensePlate.trim().toUpperCase() : undefined,
     };
 
-    const newInvitation = addInvitation(newInvitationData);
-    
-    showFeedback('success', 'Invitación creada exitosamente.');
-    handleShareInvitation(newInvitation);
-    
-    // Reset form
-    setGuestName('');
-    setGuestIdDocument('');
-    setIdDocumentError('');
-    setLicensePlate('');
-    setNotes('');
-    
-    const newNow = new Date();
-    const newTomorrow = new Date(newNow);
-    newTomorrow.setDate(newNow.getDate() + 1);
-    setValidFrom(getLocalDateTimeString(newNow));
-    setValidUntil(getLocalDateTimeString(newTomorrow));
-    
-    loadInvitations();
+    try {
+      const newInvitation = await addInvitation(newInvitationData);
+      
+      showFeedback('success', 'Invitación creada exitosamente.');
+      handleShareInvitation(newInvitation);
+      
+      // Reset form
+      setGuestName('');
+      setGuestIdDocument('');
+      setIdDocumentError('');
+      setLicensePlate('');
+      setNotes('');
+      
+      const newNow = new Date();
+      const newTomorrow = new Date(newNow);
+      newTomorrow.setDate(newNow.getDate() + 1);
+      setValidFrom(getLocalDateTimeString(newNow));
+      setValidUntil(getLocalDateTimeString(newTomorrow));
+      
+      loadInvitations();
+    } catch (err) {
+      showFeedback('error', 'Error al crear la invitación.');
+      console.error(err);
+    }
   };
   
   const userInvitations = useMemo(() => {

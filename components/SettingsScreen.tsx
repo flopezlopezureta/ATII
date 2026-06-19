@@ -70,8 +70,8 @@ const UserProfileEditor: React.FC<{
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [notifications, profileData]);
   
-  const handleAcknowledgeNotification = (notificationId: string) => {
-    updateNotification(notificationId, { 
+  const handleAcknowledgeNotification = async (notificationId: string) => {
+    await updateNotification(notificationId, { 
       status: NotificationStatus.ACKNOWLEDGED,
       acknowledgedAt: new Date().toISOString(),
     });
@@ -96,7 +96,7 @@ const UserProfileEditor: React.FC<{
     if (name === 'licensePlate' && value) setVehiclePlateError('');
   };
 
-  const handleAddVehicle = () => {
+  const handleAddVehicle = async () => {
     if (!profileData) return;
     const trimmedPlate = vehicleFormData.licensePlate.trim();
     if (!trimmedPlate) {
@@ -107,7 +107,7 @@ const UserProfileEditor: React.FC<{
         setVehiclePlateError('Esta placa ya ha sido agregada.');
         return;
     }
-    const allUsers = getDirectoryUsers();
+    const allUsers = await getDirectoryUsers();
     const isGloballyUnique = !allUsers.some(user => user.id !== profileData.id && user.vehicles.some(v => v.licensePlate === trimmedPlate));
     if (!isGloballyUnique) {
       setVehiclePlateError('Esta placa ya está registrada por otro usuario en el directorio.');
@@ -128,7 +128,7 @@ const UserProfileEditor: React.FC<{
     setProfileData(prev => prev ? { ...prev, vehicles: prev.vehicles.filter(v => v.id !== vehicleId) } : null);
   };
   
-  const handleProfileSubmit = (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profileData) {
       showFeedback('error', 'No se pudo guardar, perfil no encontrado.');
@@ -151,7 +151,7 @@ const UserProfileEditor: React.FC<{
       vehicles: finalVehicles,
     };
     
-    updateDirectoryUser(profileData.id, updates);
+    await updateDirectoryUser(profileData.id, updates);
     onProfileUpdated('Tu perfil ha sido actualizado exitosamente.');
   };
 
@@ -282,7 +282,7 @@ const SuperuserPasswordChanger: React.FC<{
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
       showFeedback('error', 'Las nuevas contraseñas no coinciden.');
@@ -294,7 +294,7 @@ const SuperuserPasswordChanger: React.FC<{
       return;
     }
 
-    const result = changeSuperuserPassword(currentUser.username, currentPassword, newPassword);
+    const result = await changeSuperuserPassword(currentUser.username, currentPassword, newPassword);
     showFeedback(result.success ? 'success' : 'error', result.message);
     if (result.success) {
       setCurrentPassword('');
@@ -334,7 +334,21 @@ const SuperuserPasswordChanger: React.FC<{
 const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onSettingsSaved, onClearEntries, entryCount, currentUser, notifications, onNotificationsUpdated
 }) => {
-  const [settings, setSettings] = useState<AppSettings>(getAppSettings());
+  const [settings, setSettings] = useState<AppSettings>({
+    condominiumName: "ATLÁNTICO II",
+    senderEmail: '',
+    recipientEmail: '',
+    sendIntervalHours: 0,
+    lastSentTimestamp: undefined,
+    conciergeModeEnabled: false,
+    totalParkingSpots: 100,
+    whatsappNotificationsEnabled: false,
+  });
+
+  useEffect(() => {
+    getAppSettings().then(setSettings);
+  }, []);
+
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordModalLoading, setPasswordModalLoading] = useState(false);
@@ -346,7 +360,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settings.condominiumName.trim()) {
       showLocalFeedback('error', 'El Nombre del Condominio es obligatorio.');
@@ -367,7 +381,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       sendIntervalHours: sendInterval,
     };
 
-    saveAppSettings(settingsToSave);
+    await saveAppSettings(settingsToSave);
     onSettingsSaved(settingsToSave);
     setIsSaveSuccess(true);
     setTimeout(() => {
@@ -399,7 +413,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setPasswordModalLoading(true);
     setPasswordModalError('');
     await new Promise(resolve => setTimeout(resolve, 300));
-    const isPasswordValid = verifyPassword(currentUser.username, password);
+    const isPasswordValid = await verifyPassword(currentUser.username, password);
     setPasswordModalLoading(false);
 
     if (isPasswordValid) {

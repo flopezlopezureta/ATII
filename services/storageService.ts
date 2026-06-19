@@ -1,59 +1,75 @@
-
 import { CondominiumEntry } from '../types.ts';
 import { sendWhatsappNotificationForEntry } from './notificationService.ts';
 
-const STORAGE_KEY = 'condominiumEntries';
-
-export const getEntries = (): CondominiumEntry[] => {
-  const entriesJson = localStorage.getItem(STORAGE_KEY);
-  if (entriesJson) {
-    try {
-      const entries = JSON.parse(entriesJson) as CondominiumEntry[];
-      // Sort by timestamp, newest first
-      return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    } catch (error) {
-      console.error("Error parsing entries from localStorage:", error);
-      return [];
-    }
+export const getEntries = async (): Promise<CondominiumEntry[]> => {
+  try {
+    const res = await fetch('/api/entries');
+    if (!res.ok) throw new Error('Error status: ' + res.status);
+    return await res.json();
+  } catch (error) {
+    console.error("Error fetching entries from API:", error);
+    return [];
   }
-  return [];
 };
 
-export const addEntry = (entry: CondominiumEntry): CondominiumEntry[] => {
-  const entries = getEntries();
-  const newId = Date.now().toString() + Math.random().toString(36).substring(2, 9);
-  const entryWithIdAndTimestamp = { 
-    ...entry, 
-    id: newId, 
-    timestamp: new Date().toISOString() 
-  } as CondominiumEntry;
-  const updatedEntries = [entryWithIdAndTimestamp, ...entries]; // Add to beginning for default newest first
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEntries));
+export const addEntry = async (entry: CondominiumEntry): Promise<CondominiumEntry[]> => {
+  try {
+    const res = await fetch('/api/entries', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(entry),
+    });
+    if (!res.ok) throw new Error('Error status: ' + res.status);
+    const updatedEntries = await res.json();
 
-  if (entryWithIdAndTimestamp.status === 'approved') {
-    sendWhatsappNotificationForEntry(entryWithIdAndTimestamp);
-  }
-
-  return updatedEntries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-};
-
-export const updateEntry = (entryId: string, updates: Partial<CondominiumEntry>): CondominiumEntry[] => {
-    let entries = getEntries();
-    const entryIndex = entries.findIndex(e => e.id === entryId);
-    if (entryIndex > -1) {
-        const originalEntry = entries[entryIndex];
-        const updatedEntry = { ...entries[entryIndex], ...updates } as CondominiumEntry;
-        entries[entryIndex] = updatedEntry;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-        
-        if (updates.status === 'approved' && originalEntry.status !== 'approved') {
-            sendWhatsappNotificationForEntry(updatedEntry);
-        }
+    // Trigger WhatsApp notification for newly approved entries (needs to run on browser client)
+    const newEntry = updatedEntries.find((e: any) => e.status === 'approved' && !entry.id); // Newly added entry will not have an ID on input but will in database
+    if (newEntry && newEntry.status === 'approved') {
+      sendWhatsappNotificationForEntry(newEntry);
     }
-    return getEntries(); // Return fresh sorted data
+
+    return updatedEntries;
+  } catch (error) {
+    console.error("Error adding entry to API:", error);
+    throw error;
+  }
 };
 
-export const clearEntries = (): CondominiumEntry[] => {
-  localStorage.removeItem(STORAGE_KEY);
-  return [];
+export const updateEntry = async (entryId: string, updates: Partial<CondominiumEntry>): Promise<CondominiumEntry[]> => {
+  try {
+    const res = await fetch(`/api/entries/${entryId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Error status: ' + res.status);
+    const updatedEntries = await res.json();
+
+    const updatedEntry = updatedEntries.find((e: any) => e.id === entryId);
+    if (updates.status === 'approved' && updatedEntry && updatedEntry.status === 'approved') {
+      sendWhatsappNotificationForEntry(updatedEntry);
+    }
+
+    return updatedEntries;
+  } catch (error) {
+    console.error("Error updating entry in API:", error);
+    throw error;
+  }
+};
+
+export const clearEntries = async (): Promise<CondominiumEntry[]> => {
+  try {
+    const res = await fetch('/api/entries', {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Error status: ' + res.status);
+    return await res.json();
+  } catch (error) {
+    console.error("Error clearing entries in API:", error);
+    return [];
+  }
 };

@@ -49,8 +49,8 @@ const ProfilesScreen: React.FC<ProfilesScreenProps> = ({ onUsersUpdated }) => {
   const [editingRole, setEditingRole] = useState<{ name: string; permissions: UserPermissions } | null>(null);
 
   useEffect(() => {
-    setUsers(getDirectoryUsers());
-    setRolePermissions(getRolePermissions());
+    getDirectoryUsers().then(setUsers);
+    getRolePermissions().then(setRolePermissions);
   }, []);
 
   const showLocalFeedback = (type: 'success' | 'error', text: string) => {
@@ -144,7 +144,7 @@ const ProfilesScreen: React.FC<ProfilesScreenProps> = ({ onUsersUpdated }) => {
     setFormData(prev => ({ ...prev, role, permissions }));
   };
   
-  const handleStaffSubmit = (e: React.FormEvent) => {
+  const handleStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFeedback(null);
 
@@ -159,23 +159,23 @@ const ProfilesScreen: React.FC<ProfilesScreenProps> = ({ onUsersUpdated }) => {
           showLocalFeedback('error', `Contraseña inválida: ${validatePassword(formData.password).message}`);
           return;
         }
-        if (editingUser.authUserId) adminUpdateUserPassword(editingUser.authUserId, formData.password);
+        if (editingUser.authUserId) await adminUpdateUserPassword(editingUser.authUserId, formData.password);
         else {
           showLocalFeedback('error', 'Este perfil no tiene una cuenta de acceso para actualizar la contraseña.');
           return;
         }
       }
       const { username, password, ...dirUpdates } = formData;
-      updateDirectoryUser(editingUser.id, dirUpdates);
+      await updateDirectoryUser(editingUser.id, dirUpdates);
       showLocalFeedback('success', `Perfil de ${editingUser.name} actualizado.`);
     } else {
       if (!formData.username || !formData.password || !validatePassword(formData.password).isValid) {
         showLocalFeedback('error', 'Nombre de usuario y contraseña válida son obligatorios.');
         return;
       }
-      const authResult = adminCreateAuthAccount(formData.username, formData.password, formData.email);
+      const authResult = await adminCreateAuthAccount(formData.username, formData.password, formData.email);
       if (authResult.success && authResult.user) {
-        addDirectoryUser({
+        await addDirectoryUser({
             ...formData,
             name: formData.name!,
             authUserId: authResult.user.id,
@@ -190,16 +190,18 @@ const ProfilesScreen: React.FC<ProfilesScreenProps> = ({ onUsersUpdated }) => {
         return;
       }
     }
-    setUsers(getDirectoryUsers());
+    const dirUsers = await getDirectoryUsers();
+    setUsers(dirUsers);
     onUsersUpdated();
     closeStaffModal();
   };
   
-  const handleSaveRolePermissions = (e: React.FormEvent) => {
+  const handleSaveRolePermissions = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingRole) return;
-    saveRolePermissions(editingRole.name, editingRole.permissions);
-    setRolePermissions(getRolePermissions());
+    await saveRolePermissions(editingRole.name, editingRole.permissions);
+    const freshPermissions = await getRolePermissions();
+    setRolePermissions(freshPermissions);
     showLocalFeedback('success', `Permisos para el rol "${editingRole.name}" guardados.`);
     closeRoleModal();
   };

@@ -95,9 +95,15 @@ const UserDirectoryScreen: React.FC = () => {
   const sessionUser = getCurrentUser();
   const isSuperAdmin = sessionUser?.id === SUPERUSER_ID_FOR_SESSION;
 
-  const loadData = useCallback(() => {
-    setDirectoryUsers(getDirectoryUsers());
-    setAuthUsers(getAuthUsers());
+  const loadData = useCallback(async () => {
+    try {
+      const dirUsers = await getDirectoryUsers();
+      const autUsers = await getAuthUsers();
+      setDirectoryUsers(dirUsers);
+      setAuthUsers(autUsers);
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -252,7 +258,7 @@ const UserDirectoryScreen: React.FC = () => {
     setUserFormData(prev => ({...prev, unitParkingSpots: (prev.unitParkingSpots || []).filter(s => s !== spot)}));
   };
 
-  const handleUserSubmit = (e: React.FormEvent) => {
+  const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
@@ -272,7 +278,7 @@ const UserDirectoryScreen: React.FC = () => {
     }
 
     if (editingUser) {
-      updateDirectoryUser(editingUser.id, userFormData);
+      await updateDirectoryUser(editingUser.id, userFormData);
       showFeedback('success', `Usuario "${userFormData.name}" actualizado.`);
     } else {
       // Creating a new user (any type)
@@ -287,10 +293,10 @@ const UserDirectoryScreen: React.FC = () => {
       }
 
       if (selectedProfile === 'resident') {
-        const authResult = adminCreateAuthAccount(username, password, userFormData.email);
+        const authResult = await adminCreateAuthAccount(username, password, userFormData.email);
         if (authResult.success && authResult.user) {
           const finalUserData = { ...userFormData, authUserId: authResult.user.id };
-          addDirectoryUser(finalUserData);
+          await addDirectoryUser(finalUserData);
           showFeedback('success', `Usuario "${finalUserData.name}" (${finalUserData.role}) creado exitosamente.`);
         } else {
           setFormError(authResult.message);
@@ -298,10 +304,10 @@ const UserDirectoryScreen: React.FC = () => {
         }
       } else { // Admin or Concierge
         if(username && password) {
-            const authResult = adminCreateAuthAccount(username, password, userFormData.email);
+            const authResult = await adminCreateAuthAccount(username, password, userFormData.email);
             if (authResult.success && authResult.user) {
                 const finalUserData = { ...userFormData, authUserId: authResult.user.id };
-                addDirectoryUser(finalUserData);
+                await addDirectoryUser(finalUserData);
                  showFeedback('success', `Usuario "${finalUserData.name}" (${finalUserData.role}) creado exitosamente.`);
             } else {
                 setFormError(authResult.message);
@@ -309,7 +315,7 @@ const UserDirectoryScreen: React.FC = () => {
             }
         } else {
             // Staff without auth account
-            addDirectoryUser(userFormData);
+            await addDirectoryUser(userFormData);
             showFeedback('success', `Perfil de Staff "${userFormData.name}" creado sin cuenta de acceso.`);
         }
       }
@@ -319,25 +325,26 @@ const UserDirectoryScreen: React.FC = () => {
     resetModalState();
   };
   
-   const handleDeleteUser = (userId: string, userName: string) => {
+   const handleDeleteUser = async (userId: string, userName: string) => {
     if (window.confirm(`¿Está seguro de que desea eliminar a ${userName} del directorio? Esta acción no se puede deshacer.`)) {
-      const updatedDirUsers = deleteDirectoryUser(userId);
+      const updatedDirUsers = await deleteDirectoryUser(userId);
       setDirectoryUsers(updatedDirUsers); 
-      setAuthUsers(getAuthUsers()); 
+      const freshAuthUsers = await getAuthUsers();
+      setAuthUsers(freshAuthUsers); 
       showFeedback('success', `Usuario ${userName} eliminado exitosamente.`);
     }
   };
 
-  const handleApproveAccount = (authUserId: string) => {
-    const result = approveUserAccount(authUserId);
+  const handleApproveAccount = async (authUserId: string) => {
+    const result = await approveUserAccount(authUserId);
     showFeedback(result.success ? 'success' : 'error', result.message);
     if (result.success) {
       loadData();
     }
   };
 
-  const handleDisableAccount = (authUserId: string) => {
-    const result = disableUserAccount(authUserId);
+  const handleDisableAccount = async (authUserId: string) => {
+    const result = await disableUserAccount(authUserId);
     showFeedback(result.success ? 'success' : 'error', result.message);
     if (result.success) {
       loadData();

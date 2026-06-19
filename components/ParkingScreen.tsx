@@ -12,11 +12,27 @@ interface ParkingScreenProps {
 
 const ParkingScreen: React.FC<ParkingScreenProps> = ({ appSettings }) => {
     const [searchTerm, setSearchTerm] = useState('');
+    const [users, setUsers] = useState<any[]>([]);
+    const [vehicleEntries, setVehicleEntries] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    React.useEffect(() => {
+        const loadData = async () => {
+            try {
+                const u = await getDirectoryUsers();
+                const entries = await getEntries();
+                setUsers(u);
+                setVehicleEntries(entries.filter(e => e.type === EntryType.VEHICLE));
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadData();
+    }, []);
 
     const parkingData = useMemo(() => {
-        const users = getDirectoryUsers();
-        const vehicleEntries = getEntries().filter(e => e.type === EntryType.VEHICLE) as VehicleEntry[];
-
         const totalSpots = appSettings.totalParkingSpots || 0;
         if (totalSpots === 0) {
             return [];
@@ -126,7 +142,13 @@ const ParkingScreen: React.FC<ParkingScreenProps> = ({ appSettings }) => {
             default: return 'Desconocido';
         }
     };
-
+    if (isLoading) {
+        return (
+            <div className="bg-white p-6 md:p-8 rounded-xl shadow-2xl w-full mx-auto flex justify-center items-center py-20 animate-pulse">
+                <p className="text-slate-500 text-lg font-medium">Cargando estado de estacionamientos...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white p-6 md:p-8 rounded-xl shadow-2xl w-full mx-auto">

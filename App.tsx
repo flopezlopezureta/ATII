@@ -19,7 +19,7 @@ import { getEntries as getEntriesFromStorage, clearEntries as clearEntriesFromSt
 import { getCurrentUser, logoutUser, isSuperuserConfigured, SUPERUSER_ID_FOR_SESSION } from './services/authService.ts';
 import { getAppSettings, saveAppSettings } from './services/settingsService.ts';
 import { getNotifications } from './services/notificationService.ts';
-import { findDirectoryUserByAuthId } from './services/directoryService.ts';
+import { findDirectoryUserByAuthId, getDirectoryUsers } from './services/directoryService.ts';
 import UserIcon from './components/icons/UserIcon.tsx';
 import SettingsIcon from './components/icons/SettingsIcon.tsx';
 import BoltIcon from './components/icons/BoltIcon.tsx';
@@ -47,7 +47,16 @@ const App: React.FC = () => {
   const [entries, setEntries] = useState<CondominiumEntry[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  const [appSettings, setAppSettings] = useState<AppSettings>(getAppSettings()); // Initialize with defaults
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    condominiumName: "ATLÁNTICO II",
+    senderEmail: '',
+    recipientEmail: '',
+    sendIntervalHours: 0,
+    lastSentTimestamp: undefined,
+    conciergeModeEnabled: false,
+    totalParkingSpots: 100,
+    whatsappNotificationsEnabled: false,
+  });
   const [invitationIdToProcess, setInvitationIdToProcess] = useState<string | null>(null);
   const [initialVisitType, setInitialVisitType] = useState<'person' | 'vehicle'>('person');
 
@@ -75,22 +84,28 @@ const App: React.FC = () => {
   }, [currentUser, userDirectoryProfile, isCurrentUserSuperuser]);
 
 
-  const checkAuth = useCallback(() => {
+  const checkAuth = useCallback(async () => {
       setIsLoadingAuth(true);
-      setNeedsSuperuserSetup(!isSuperuserConfigured()); 
+      setNeedsSuperuserSetup(false); 
 
       const user = getCurrentUser();
       setCurrentUser(user);
-      const currentSettings = getAppSettings(); 
-      setAppSettings(currentSettings);
       
-      if (user) {
-          const profile = findDirectoryUserByAuthId(user.id);
-          if (user.id === SUPERUSER_ID_FOR_SESSION || profile?.permissions?.authorizePeople) {
-              setCurrentView(View.VIEW_ENTRIES);
-          } else {
-              setCurrentView(View.INVITATIONS);
-          }
+      try {
+        const currentSettings = await getAppSettings(); 
+        setAppSettings(currentSettings);
+        
+        if (user) {
+            await getDirectoryUsers(); // populate cache
+            const profile = findDirectoryUserByAuthId(user.id);
+            if (user.id === SUPERUSER_ID_FOR_SESSION || profile?.permissions?.authorizePeople) {
+                setCurrentView(View.VIEW_ENTRIES);
+            } else {
+                setCurrentView(View.INVITATIONS);
+            }
+        }
+      } catch (err) {
+        console.error(err);
       }
       setIsLoadingAuth(false);
   }, []);
@@ -99,10 +114,16 @@ const App: React.FC = () => {
     checkAuth();
   }, [checkAuth]);
   
-  const fetchAllData = useCallback(() => {
+  const fetchAllData = useCallback(async () => {
     if (currentUser) {
-      setEntries(getEntriesFromStorage());
-      setNotifications(getNotifications());
+      try {
+        const ent = await getEntriesFromStorage();
+        setEntries(ent);
+        const notif = await getNotifications();
+        setNotifications(notif);
+      } catch (err) {
+        console.error(err);
+      }
     }
   }, [currentUser]);
 
@@ -141,12 +162,13 @@ const App: React.FC = () => {
     fetchAllData();
   };
   
-  const handleNotificationsUpdated = () => {
-    setNotifications(getNotifications());
+  const handleNotificationsUpdated = async () => {
+    const notifs = await getNotifications();
+    setNotifications(notifs);
   };
 
-  const handleClearAllEntries = () => {
-    const remainingEntries = clearEntriesFromStorage();
+  const handleClearAllEntries = async () => {
+    const remainingEntries = await clearEntriesFromStorage();
     setEntries(remainingEntries);
   };
   

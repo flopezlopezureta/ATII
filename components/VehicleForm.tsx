@@ -56,12 +56,16 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ entries, onEntryAdded, curren
 
 
   const MIN_PLATE_LENGTH_FOR_CHECK = 4;
-  const allDirectoryUsers = getDirectoryUsers(); 
+  const [allDirectoryUsers, setAllDirectoryUsers] = useState<DirectoryUser[]>([]);
+
+  useEffect(() => {
+    getDirectoryUsers().then(setAllDirectoryUsers).catch(console.error);
+  }, []);
 
   const canAutoApprove = userProfile?.permissions?.authorizeVehicles ?? false;
 
-  const handleInvitationScan = (invitationId: string) => {
-    const invitation = getInvitationById(invitationId);
+  const handleInvitationScan = async (invitationId: string) => {
+    const invitation = await getInvitationById(invitationId);
     
     if (!invitation) {
         setDirectoryCheckFeedback(`Error: Invitación con ID ${invitationId} no encontrada.`);
@@ -93,8 +97,11 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ entries, onEntryAdded, curren
   
   useEffect(() => {
     if (invitationIdToProcess && onInvitationProcessed) {
-      handleInvitationScan(invitationIdToProcess);
-      onInvitationProcessed();
+      const processInvitation = async () => {
+        await handleInvitationScan(invitationIdToProcess);
+        onInvitationProcessed();
+      };
+      processInvitation();
     }
   }, [invitationIdToProcess, onInvitationProcessed]);
 
@@ -478,7 +485,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ entries, onEntryAdded, curren
     setLinkedInvitation(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const currentDirectoryFeedback = directoryCheckFeedback; 
     const isChoiceStillPending = authorizerChoiceRequired && !chosenAuthorizerType && potentialChoiceDetails;
@@ -522,12 +529,12 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ entries, onEntryAdded, curren
       status: initialStatus,
     };
     
-    const updatedEntries = addEntry(newVehicleEntry as VehicleEntry);
+    const updatedEntries = await addEntry(newVehicleEntry as VehicleEntry);
 
     if (linkedInvitation) {
         const newEntryRecord = updatedEntries.find(entry => entry.id === entry.id && (entry as VehicleEntry).invitationId === linkedInvitation.id);
         if (newEntryRecord) {
-            markInvitationAsUsed(linkedInvitation.id, newEntryRecord.id);
+            await markInvitationAsUsed(linkedInvitation.id, newEntryRecord.id);
         }
     }
 
