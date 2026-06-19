@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import QRCode from 'https://esm.sh/qrcode';
+import QRCode from 'qrcode';
 import { Invitation } from '../types.ts';
 import { getAppSettings } from '../services/settingsService.ts';
 import QrCodeIcon from './icons/QrCodeIcon.tsx';

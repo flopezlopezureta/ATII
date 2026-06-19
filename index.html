@@ -22,12 +22,10 @@
     color-scheme: light;
   }
 </style>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-slate-100">
   <div id="root"></div>
-
-  <!-- Load the application's JavaScript module -->
-  <script type="module" src="dist/bundle.js"></script>
 
   <!-- Service Worker registration -->
   <script>
@@ -41,5 +39,6 @@
         });
       }
   </script>
+  <script type="module" src="/index.tsx"></script>
 </body>
 </html>

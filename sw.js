@@ -2,11 +2,7 @@ const CACHE_NAME = 'condo-access-cache-v6'; // Incremented cache version for a c
 const URLS_TO_PRECACHE = [
   '/',
   'index.html',
-  'https://unpkg.com/react@18/umd/react.production.min.js',
-  'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
-  'dist/bundle.js'
-  // Note: We do not precache tailwindcss CDN as it causes a CORS error.
-  // It will be cached on the first successful fetch instead.
+  'index.css'
 ];
 
 self.addEventListener('install', event => {
