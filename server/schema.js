@@ -19,7 +19,7 @@ export const initializeDatabase = async () => {
     `);
 
     // 2. Directory Users Table
-    await client.query(\`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS directory_users (
         id VARCHAR(50) PRIMARY KEY,
         auth_user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
@@ -38,7 +38,7 @@ export const initializeDatabase = async () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
-    \`);
+    `);
 
     // 3. Directory Vehicles Table
     await client.query(`
