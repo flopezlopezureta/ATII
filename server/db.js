@@ -7,11 +7,17 @@ const { Pool } = pg;
 
 const connectionString = process.env.DATABASE_URL;
 
+// Enable SSL only if explicitly requested in the connection string or via environment variable
+const sslEnabled = connectionString && (
+  connectionString.includes('sslmode=require') ||
+  connectionString.includes('ssl=true') ||
+  process.env.DB_SSL === 'true'
+);
+
 export const pool = new Pool({
   connectionString,
-  ssl: connectionString && !connectionString.includes('localhost') && !connectionString.includes('127.0.0.1')
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl: sslEnabled ? { rejectUnauthorized: false } : false,
 });
 
 export const query = (text, params) => pool.query(text, params);
+
