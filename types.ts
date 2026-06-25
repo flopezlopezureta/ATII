@@ -77,6 +77,7 @@ export interface AppSettings {
   conciergeModeEnabled?: boolean;
   totalParkingSpots?: number;
   whatsappNotificationsEnabled?: boolean;
+  rolePermissions?: string;
 }
 
 export interface DirectoryVehicle {

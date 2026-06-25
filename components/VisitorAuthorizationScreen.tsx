@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Invitation } from '../types.ts';
 import { getInvitations } from '../services/invitationService.ts';
 import UserIcon from './icons/UserIcon.tsx';

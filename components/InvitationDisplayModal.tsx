@@ -55,7 +55,7 @@ const InvitationDisplayModal: React.FC<InvitationDisplayModalProps> = ({ invitat
     const ctx = finalCanvas.getContext('2d');
     if (!ctx) return;
 
-    const appSettings = getAppSettings();
+    const appSettings = await getAppSettings();
     
     // --- Configuration ---
     const qrCanvas = canvasRef.current;
